@@ -1,0 +1,19 @@
+package SteamKit.Base.Unified.SteamMsgEcon;
+import "steammessages_unified_base.steamclient.proto";
+
+option cc_generic_services = true;
+
+message CEcon_ClientGetItemShopOverlayAuthURL_Request {
+	optional string return_url = 1;
+}
+
+message CEcon_ClientGetItemShopOverlayAuthURL_Response {
+	optional string url = 1;
+}
+
+service Econ {
+	option (SteamKit.Base.Unified.SteamMsgUnifiedBase.service_description) = "A service that provides communication with the econ servers";
+	rpc ClientGetItemShopOverlayAuthURL (CEcon_ClientGetItemShopOverlayAuthURL_Request) returns (CEcon_ClientGetItemShopOverlayAuthURL_Response) {
+		option (SteamKit.Base.Unified.SteamMsgUnifiedBase.method_description) = "Generates a URL which sets a secure cookie for in-game-browser itemshop purchases";
+	}
+}
