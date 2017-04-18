@@ -4,18 +4,21 @@ namespace SteamKit\Generate;
 
 use SteamKit\Generate\Protobufs;
 use SteamKit\Generate\Enums;
+use SteamKit\Generate\SteamLanguages;
 use SteamKit\Generate\SteamServers;
 
 class Builder
 {
 	protected $_protobufs;
 	protected $_enums;
+	protected $_steamLanguages;
 	protected $_steamServers;
 
 	public function __construct()
 	{
 		$this->_protobufs = new Protobufs();
 		$this->_enums = new Enums();
+		$this->_steamLanguages = new SteamLanguages();
 		$this->_steamServers = new SteamServers();
 	}
 
@@ -120,6 +123,16 @@ class Builder
 		]);
 	}
 
+	public function addAllSteamLanguages()
+	{
+		$this->_steamLanguages->addSteamLanguages([
+			['file' => 'gamecoordinator.steamd', 'interface' => 'IGCSerializableHeader'],
+			['file' => 'header.steamd', 'interface' => 'ISteamSerializableHeader'],
+			['file' => 'netheader.steamd', 'interface' => 'ISteamSerializable'],
+			['file' => 'steammsg.steamd', 'interface' => 'ISteamSerializableMessage'],
+		]);
+	}
+
 	public function generateProtobufs()
 	{
 		$this->_protobufs->generateProtobufs();
@@ -130,6 +143,11 @@ class Builder
 		$this->_enums->generateEnums();
 	}
 
+	public function generateSteamLanguages()
+	{
+		$this->_steamLanguages->generateSteamLanguages();
+	}
+
 	public function generateSteamServers()
 	{
 		$this->_steamServers->generateSteamServers();
@@ -137,15 +155,16 @@ class Builder
 
 	public function generateAllResources()
 	{
-		$ignore = ['__construct', 'generateProtobufs', 'generateAllResources', 'generateEnums', 'generateSteamServers'];
+		$ignore = ['__construct', 'generateProtobufs', 'generateAllResources', 'generateEnums', 'generateSteamLanguages', 'generateSteamServers'];
 		foreach (get_class_methods($this) as $method) {
 			if (!in_array($method, $ignore)) {
 				$this->$method();
 			}
 		}
 
-		$this->_protobufs->generateProtobufs();
-		$this->_enums->generateEnums();
-		$this->_steamServers->generateSteamServers();
+		$this->generateProtobufs();
+		$this->generateEnums();
+		$this->generateSteamLanguages();
+		$this->generateSteamServers();
 	}
 }

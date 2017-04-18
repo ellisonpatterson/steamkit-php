@@ -2,12 +2,21 @@
 
 namespace SteamKit\Helper;
 
+use phpseclib\Crypt\Base;
+use phpseclib\Crypt\AES;
+use phpseclib\Crypt\RSA;
+
+use SteamKit\Helper\FileManager;
+
 class Crypto
 {
 	public static function generateSessionKey()
 	{
-		$sessionKey = openssl_random_pseudo_bytes(32);
-		openssl_public_encrypt($sessionKey, $cryptedSessionKey, \SteamKit\Helper\FileManager::readFileData('Resources/Crypto/public.pub'));
+		$rsa = new RSA();
+		$rsa->loadKey(FileManager::readFileData('Resources/Crypto/system.pem'));
+
+		$sessionKey = 'abcdefghijklmnopqrstuvwxyz123456';
+		$cryptedSessionKey = $rsa->encrypt($sessionKey);
 
 		return [
 			'plain' => $sessionKey,
@@ -15,52 +24,57 @@ class Crypto
 		];
 	}
 
-    public static function symmetricEncrypt($data, $sessionKey)
-    {
-        $salt = openssl_random_pseudo_bytes(8);
+	public static function symmetricEncrypt($data, $sessionKey)
+	{
+		$iv = openssl_random_pseudo_bytes(16);
 
-        $salted = '';
-        $dx = '';
+		$aesIv = new AES(Base::MODE_ECB);
+		$aesIv->setPreferredEngine(Base::ENGINE_OPENSSL);
+		$aesIv->setKey($sessionKey);
+		$aesIv->disablePadding();
 
-        // Salt the key(32) and iv(16) = 48
-        while (strlen($salted) < 48) {
-            $dx = md5($dx.$sessionKey.$salt, true);
-            $salted .= $dx;
-        }
+		$finalIv = $aesIv->encrypt($iv);
 
-        $sessionKey = substr($salted, 0, 32);
-        $iv  = substr($salted, 32, 16);
+		$aesData = new AES(Base::MODE_CBC);
+		$aesData->setPreferredEngine(Base::ENGINE_OPENSSL);
+		$aesData->setKey($sessionKey);
+		$aesData->setIV($iv);
 
-        $encryptedData = openssl_encrypt($data, 'aes-256-cbc', $sessionKey, OPENSSL_RAW_DATA, $iv);
+		$finalData = $aesData->encrypt($data);
 
-        return base64_encode('Salted__' . $salt . $encryptedData);
-    }
+		return $finalIv . $finalData;
+	}
 
-    public static function symmetricDecrypt($data, $sessionKey)
-    {
-        $data = base64_decode($data);
-        $salt = substr($data, 8, 8);
-        $ciphertext = substr($data, 16);
+	public static function symmetricDecrypt($data, $sessionKey)
+	{
+		$cryptedIv = substr($data, 0, 16);
+		$cipherText = substr($data, 16, strlen($data));
 
-        $rounds = 3;
-        $data00 = $sessionKey.$salt;
-        $md5Hash = array();
-        $md5Hash[0] = md5($data00, true);
-        $result = $md5Hash[0];
+		$aesIv = new AES(Base::MODE_ECB);
+		$aesIv->setPreferredEngine(Base::ENGINE_OPENSSL);
+		$aesIv->setKey($sessionKey);
+		$aesIv->disablePadding();
 
-        for ($i = 1; $i < $rounds; $i++) {
-            $md5Hash[$i] = md5($md5Hash[$i - 1].$data00, true);
-            $result .= $md5Hash[$i];
-        }
+		$iv = $aesIv->decrypt($cryptedIv);
 
-        $key = substr($result, 0, 32);
-        $iv  = substr($result, 32, 16);
+		$aesData = new AES(Base::MODE_CBC);
+		$aesData->setPreferredEngine(Base::ENGINE_OPENSSL);
+		$aesData->setKey($sessionKey);
+		$aesData->setIV($iv);
+		$decrypted = $aesData->decrypt($cipherText);
 
-        return openssl_decrypt($ciphertext, 'aes-256-cbc', $key, true, $iv);
-    }
+		return $decrypted;
 
-    public function wrapForOpenSSL($data)
-    {
-        return chunk_split($data, 64);
-    }
+		// var_dump(array(
+			// 'sessionKey' => $sessionKey,
+			// 'sessionKeyLength' => strlen($sessionKey),
+			// 'cryptedIv' => $cryptedIv,
+			// 'cryptedIvLength' => strlen($cryptedIv),
+			// 'cipherText' => $cipherText,
+			// 'cipherTextLength' => strlen($cipherText),
+			// 'iv' => $iv,
+			// 'ivLength' => strlen($iv),
+			// 'decrypted' => $decrypted
+		// ));
+	}
 }

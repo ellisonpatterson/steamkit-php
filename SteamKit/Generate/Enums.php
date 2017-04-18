@@ -46,7 +46,7 @@ class Enums
 					if (preg_match('/^};?$/', $line)) {
 						$file = "<?php\n\nnamespace SteamKit\Base\Enums;\n\nclass " . $currentEnum['name'] . "\n{\n";
 						foreach ($currentEnum['values'] as $value) {
-							$file .= "\tconst " . $value['name'] . " = " . (is_int($value['value']) ? $value['value'] : "\"" . $value['value'] . "\"") . ";" . (!empty($value['comment']) ? " // " . trim($value['comment']) : "") . "\n";
+							$file .= "\tconst " . $value['name'] . " = " . (ctype_digit($value['value']) ? $value['value'] : "\"" . $value['value'] . "\"") . ";" . (!empty($value['comment']) ? " // " . trim($value['comment']) : "") . "\n";
 						}
 
 						// $file .= "\n\t// Value-to-name mapping for convenience\n";
@@ -69,6 +69,10 @@ class Enums
 								$file .= "\n\tpublic static function " . $value['name'] . "\n\t{\n\t\treturn " . $value['value'] . ";\n\t}\n";
 							}
 						}
+
+						$file .= "\n\tpublic static function getAllEnums()\n\t{\n\t\t\$class = new ReflectionClass('" . $currentEnum['name'] . "');\n\t\treturn \$class->getConstants();\n\t}\n";
+						$file .= "\n\tpublic static function getByName(\$name)\n\t{\n\t\t\$constants = self::getAllEnums();\n\t\tif (array_key_exists(\$name, \$constants)) {\n\t\t\treturn \$constants[\$name];\n\t\t}\n\n\t\treturn false;\n\t}\n";
+						$file .= "\n\tpublic static function getByValue(\$value)\n\t{\n\t\t\$constants = self::getAllEnums();\n\t\t\$key = array_search(\$value, \$constants);\n\t\tif (\$key !== null || \$key !== false) {\n\t\t\treturn \$key;\n\t\t}\n\n\t\treturn false;\n\t}\n";
 
 						$file .= "}\n?>";
 
