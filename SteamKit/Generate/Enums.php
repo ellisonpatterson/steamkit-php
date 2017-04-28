@@ -49,28 +49,13 @@ class Enums
 							$file .= "\tconst " . $value['name'] . " = " . (ctype_digit($value['value']) ? $value['value'] : "\"" . $value['value'] . "\"") . ";" . (!empty($value['comment']) ? " // " . trim($value['comment']) : "") . "\n";
 						}
 
-						// $file .= "\n\t// Value-to-name mapping for convenience\n";
-						// foreach ($currentEnum['values'] as $idx => $value) {
-							// if (preg_match('/^-?[0-9]+/', $value['value']) === false) {
-								// continue;
-							// }
-
-							// foreach ($currentEnum['values'] as $idx2 => $val2) {
-								// if ($val2['value'] == $value['value'] && $idx2 > $idx) {
-									// continue 2;
-								// }
-							// }
-
-							// $file .= "\t\"" . $value['value'] . "\": \"" . $value['name'] . "\",\n";
-						// }
-
 						if (!empty($currentEnum['dynamicValues'])) {
 							foreach ($currentEnum['dynamicValues'] as $idx => $value) {
 								$file .= "\n\tpublic static function " . $value['name'] . "\n\t{\n\t\treturn " . $value['value'] . ";\n\t}\n";
 							}
 						}
 
-						$file .= "\n\tpublic static function getAllEnums()\n\t{\n\t\t\$class = new ReflectionClass('" . $currentEnum['name'] . "');\n\t\treturn \$class->getConstants();\n\t}\n";
+						$file .= "\n\tpublic static function getAllEnums()\n\t{\n\t\t\$class = new \\ReflectionClass(get_called_class());\n\t\treturn \$class->getConstants();\n\t}\n";
 						$file .= "\n\tpublic static function getByName(\$name)\n\t{\n\t\t\$constants = self::getAllEnums();\n\t\tif (array_key_exists(\$name, \$constants)) {\n\t\t\treturn \$constants[\$name];\n\t\t}\n\n\t\treturn false;\n\t}\n";
 						$file .= "\n\tpublic static function getByValue(\$value)\n\t{\n\t\t\$constants = self::getAllEnums();\n\t\t\$key = array_search(\$value, \$constants);\n\t\tif (\$key !== null || \$key !== false) {\n\t\t\treturn \$key;\n\t\t}\n\n\t\treturn false;\n\t}\n";
 

@@ -3,22 +3,19 @@
 namespace SteamKit\Client\Network\Connection;
 
 use SteamKit\Client\Network\Connection;
-
-use PhpBinaryReader\BinaryReader;
-use Google\FlatBuffers\ByteBuffer;
+use SteamKit\Helper\BinReader;
 
 class TCPConnection extends Connection
 {
-	public function send($data)
-	{
-		
-	}
-
 	protected function _onReceive($cli, $data)
 	{
-		$binaryReader = new BinaryReader($data);
-
 		while (true) {
+			if (empty($data)) {
+				continue;
+			}
+
+			$binaryReader = new BinReader($data);
+
 			if (!$cli->isConnected()) {
 				break;
 			}
@@ -28,8 +25,8 @@ class TCPConnection extends Connection
 				continue;
 			}
 
-			$packetLen = $binaryReader->readUInt32();
-			$packetMagic = $binaryReader->readUInt32();
+			$packetLen = $binaryReader->readUInt();
+			$packetMagic = $binaryReader->readUInt();
 
 			if ($packetMagic != $this->getMagic()) {
 				echo "Got a packet with invalid magic!\n";
@@ -44,7 +41,12 @@ class TCPConnection extends Connection
 				$packData = \SteamKit\Helper\Crypto::symmetricDecrypt($packData, $this->getSessionKey()['plain']);
 			}
 
-			$this->getPacketMsg($packData);
+			$packet = $this->getPacketMsg($packData);
+			if (empty($packet)) {
+				continue;
+			}
+
+			$cli->send($packet);
 		}
 	}
 

@@ -2,9 +2,10 @@
 
 namespace SteamKit\Client;
 
+use SteamKit\SteamKit;
+
 class Client
 {
-	protected $_connection;
 	protected $_connectionTypes = [
 		'tcp' => 'SteamKit\Client\Network\Connection\TCPConnection',
 		'udp' => 'SteamKit\Client\Network\Connection\UDPConnection'
@@ -19,12 +20,12 @@ class Client
 		$connectionTypeClass = $this->_connectionTypes[$type];
 
 		$server = \SteamKit\Client\Network\Servers::getRandomServer();
-		$this->_connection = new $connectionTypeClass($server);
+		SteamKit::set('connection', new $connectionTypeClass($server));
 	}
 
 	public function connect()
 	{
-		$this->_connection->connect();
+		SteamKit::get('connection')->connect();
 	}
 
 	public function disconnect()

@@ -8,4 +8,7 @@ include_once(__DIR__ .  '/vendor/autoload.php');
 $steamKit = new SteamKit();
 
 $builder = new Builder();
-$builder->generateAllResources();
+$builder->addAllSteamLanguages();
+$builder->generateSteamLanguages();
+
+// $builder->generateAllResources();

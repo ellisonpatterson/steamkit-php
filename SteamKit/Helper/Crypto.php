@@ -15,7 +15,7 @@ class Crypto
 		$rsa = new RSA();
 		$rsa->loadKey(FileManager::readFileData('Resources/Crypto/system.pem'));
 
-		$sessionKey = 'abcdefghijklmnopqrstuvwxyz123456';
+		$sessionKey = openssl_random_pseudo_bytes(32);
 		$cryptedSessionKey = $rsa->encrypt($sessionKey);
 
 		return [
@@ -64,17 +64,5 @@ class Crypto
 		$decrypted = $aesData->decrypt($cipherText);
 
 		return $decrypted;
-
-		// var_dump(array(
-			// 'sessionKey' => $sessionKey,
-			// 'sessionKeyLength' => strlen($sessionKey),
-			// 'cryptedIv' => $cryptedIv,
-			// 'cryptedIvLength' => strlen($cryptedIv),
-			// 'cipherText' => $cipherText,
-			// 'cipherTextLength' => strlen($cipherText),
-			// 'iv' => $iv,
-			// 'ivLength' => strlen($iv),
-			// 'decrypted' => $decrypted
-		// ));
 	}
 }

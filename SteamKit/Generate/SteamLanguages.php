@@ -10,36 +10,36 @@ class SteamLanguages
 	{
 		return [
 			'byte' => [
-				'read' => 'readBytes',
-				'write' => 'addByte',
+				'read' => 'readByte',
+				'write' => 'writeByte',
 			],
 			'short' => [
-				'read' => 'readInt16',
-				'write' => 'addShort'
+				'read' => 'readShort',
+				'write' => 'writeShort'
 			],
 			'ushort' => [
-				'read' => 'readUInt16',
-				'write' => 'addUshort',
+				'read' => 'readUShort',
+				'write' => 'writeUShort',
 			],
 			'int' => [
-				'read' => 'readInt32',
-				'write' => 'addInt',
+				'read' => 'readInt',
+				'write' => 'writeInt',
 			],
 			'uint' => [
-				'read' => 'readUInt32',
-				'write' => 'addUint',
+				'read' => 'readUInt',
+				'write' => 'writeUInt',
 			],
 			'long' => [
-				'read' => 'readInt64',
-				'write' => 'addLong',
+				'read' => 'readLong',
+				'write' => 'writeLong',
 			],
 			'ulong' => [
-				'read' => 'readUInt64',
-				'write' => 'addUlong',
+				'read' => 'readULong',
+				'write' => 'writeULong',
 			],
 			'char' => [
 				'read' => 'readString',
-				'write' => 'createString'
+				'write' => 'writeString'
 			]
 		];
 	}
@@ -55,7 +55,31 @@ class SteamLanguages
 			$steamLanguageFile = 'Resources/SteamLanguage/' . $steamLanguage['file'];
 			$contents = explode(PHP_EOL, \SteamKit\Helper\FileManager::readFileData($steamLanguageFile));
 
-			$currentSteamLanguage = null;
+			// Get a list of all things to process!
+			$classes = [];
+			foreach ($contents as $line) {
+				$line = trim($line);
+				$idx = strrpos($line, '//');
+				if ($idx !== false) {
+					$line = trim(substr($line, 0));
+				}
+
+				if (empty($line)) {
+					continue;
+				}
+
+				$match = false;
+				if (preg_match('/^class ([a-zA-Z0-9]+)(<[a-z]+>)?(<.*>)?/', $line, $match)) {
+					$classes[] = $match[1];
+				}
+			}
+		}
+
+		$currentSteamLanguage = null;
+
+		foreach ($this->_steamLanguages as $steamLanguage) {
+			$steamLanguageFile = 'Resources/SteamLanguage/' . $steamLanguage['file'];
+			$contents = explode(PHP_EOL, \SteamKit\Helper\FileManager::readFileData($steamLanguageFile));
 
 			foreach ($contents as $line) {
 				$line = trim($line);
@@ -80,9 +104,7 @@ class SteamLanguages
 							'class' => $match[1],
 							'emsg' => $emsg,
 							'const' => [],
-							'marshals' => [],
 							'values' => [],
-							'proto' => [],
 							'interface' => $steamLanguage['interface']
 						];
 					}
@@ -93,9 +115,12 @@ class SteamLanguages
 					}
 				} else {
 					if (preg_match('/^};?$/', $line)) {
-						// echo '<pre>'; var_dump($currentSteamLanguage); echo '</pre>';
+						// if ($currentSteamLanguage['emsg'] === false) {
+							// var_dump($currentSteamLanguage);
+							// die();
+						// }
 
-						$file = "<?php\n\nnamespace SteamKit\\Base\\SteamLanguage;\n\nuse Google\FlatBuffers\FlatBufferBuilder;\nuse PhpBinaryReader\BinaryReader;\n\nclass " . $currentSteamLanguage['class'] . " implements " . $currentSteamLanguage['interface'] . "\n{";
+						$file = "<?php\n\nnamespace SteamKit\\Base\\SteamLanguage;\n\nuse SteamKit\Helper\BinReader;\nuse SteamKit\Helper\BinWriter;\n\nclass " . $currentSteamLanguage['class'] . " implements " . $currentSteamLanguage['interface'] . "\n{";
 
 						if (!empty($currentSteamLanguage['const'])) {
 							$file .= "\n";
@@ -108,16 +133,28 @@ class SteamLanguages
 							foreach ($currentSteamLanguage['values'] as $value) {
 								$file .= "\n\tpublic \$" . $value['name'] . " = null;";
 							}
-							$file .= "\n\tpublic \$emsg = null;\n";
+
+							if ($currentSteamLanguage['emsg']) {
+								$file .= "\n\tpublic \$emsg = null;\n";
+							}
 						}
 
 						if (!empty($currentSteamLanguage['values'])) {
 							foreach ($currentSteamLanguage['values'] as $value) {
-								$file .= "\n\tpublic function get" . ucwords($value['name']) . "()\n\t{\n\t\treturn \$this->" . $value['name'] . ";\n\t}\n";
-								$file .= "\n\tpublic function set" . ucwords($value['name']) . "(\$value)\n\t{\n\t\t\$this->" . $value['name'] . " = \$value;\n\t}\n";
+								if ($value['extra'] == 'steamidmarshal') {
+									$file .= "\n\tpublic function get" . ucwords($value['name']) . "()\n\t{\n\t\treturn new \SteamID(\$this->steamID);\n\t}\n";
+									$file .= "\n\tpublic function set" . ucwords($value['name']) . "()\n\t{\n\t\t\$steamID = new \SteamID(\$value);\n\t\t\$this->steamID = \$steamID->ConvertToUInt64();\n\t}\n";
+								} else if ($value['extra'] == 'boolmarshal') {
+									
+								} else if ($value['extra'] == 'gameidmarshal') {
+									
+								} else {
+									$file .= "\n\tpublic function get" . ucwords($value['name']) . "()\n\t{\n\t\treturn \$this->" . $value['name'] . ";\n\t}\n";
+									$file .= "\n\tpublic function set" . ucwords($value['name']) . "(\$value)\n\t{\n\t\t\$this->" . $value['name'] . " = \$value;\n\t}\n";
+								}
 							}
 
-							$file .= "\n\tpublic function setValues(array \$values)\n\t{\n\t\tforeach (\$values as \$name => \$value) {\n\t\t\tif (isset(\$this->\$name)) {\n\t\t\t\t\$this->\$name = \$value;\n\t\t\t}\n\t\t}\n\t}\n";
+							$file .= "\n\tpublic function setValues(array \$values = [])\n\t{\n\t\tforeach (\$values as \$name => \$value) {\n\t\t\tif (isset(\$this->\$name)) {\n\t\t\t\t\$this->\$name = \$value;\n\t\t\t}\n\t\t}\n\t}\n";
 						}
 
 						switch ($currentSteamLanguage['interface']) {
@@ -131,41 +168,68 @@ class SteamLanguages
 								break;
 						}
 
-						if (!empty($currentSteamLanguage['values']) || !empty($currentSteamLanguage['emsg'])) {
-							$file .= "\tpublic function __construct()\n\t{";
+						if (!empty($currentSteamLanguage['values']) || $currentSteamLanguage['emsg']) {
+							$file .= "\tpublic function __construct(array \$values = [])\n\t{";
 							foreach ($currentSteamLanguage['values'] as $value) {
 								$file .= "\n\t\t\$this->" . $value['name'] . " = " . ($value['value'] ? $value['value'] : 0) . ";";
 							}
 
-							if (!empty($currentSteamLanguage['emsg'])) {
+							if ($currentSteamLanguage['emsg']) {
 								$file .= "\n\t\t\$this->emsg = \\SteamKit\\Base\\Enums\\EMsg::" . $currentSteamLanguage['emsg'] . ";";
 							}
+
+							$file .= "\n\t\t\$this->setValues(\$values);";
 
 							$file .="\n\t}\n\n";
 						}
 
-						if (!empty($currentSteamLanguage['values'])) {
-							$file .= "\tpublic function encode()\n\t{\n\t\t\$bw = new FlatbufferBuilder(0);\n";
+						if ($currentSteamLanguage['values']) {
+							$file .= "\tpublic function encode()\n\t{\n\t\t\$bw = new BinWriter();\n";
 							$file .= "\n"; $readerTypeMap = $this->_readerTypeMap();
 							foreach ($currentSteamLanguage['values'] as $value) {
-								$method = 'addInt';
+								$method = 'writeInt';
 								if (array_key_exists($value['type'], $readerTypeMap)) {
 									$method = $readerTypeMap[$value['type']]['write'];
+								}
+
+								if ($currentSteamLanguage['interface'] == 'ISteamSerializableHeader') {
+									if ($value['name'] == 'proto') {
+										$file .= "\t\t\$proto = (string) \$this->proto;\n";
+										continue;
+									}
+
+									if ($value['type'] == 'protomask') {
+										$file .= "\t\t\$bw->" . $method . "(\\SteamKit\\Helper\\MsgUtil::makeMsg(\$this->" . $value['name'] . ", true));\n";
+										continue;
+									}
+								}
+
+								if ($currentSteamLanguage['interface'] == 'IGCSerializableHeader') {
+									if ($value['name'] == 'proto') {
+										$file .= "\t\t\$proto = (string) \$this->proto;\n";
+										continue;
+									}
+
+									if ($value['type'] == 'protomask') {
+										$file .= "\t\t\$bw->" . $method . "(\\SteamKit\\Helper\\MsgUtil::makeGCMsg(\$this->" . $value['name'] . ", true));\n";
+										continue;
+									}
 								}
 
 								$file .= "\t\t\$bw->" . $method . "(\$this->" . $value['name'] . ");\n";
 							}
 
-							$file .= "\n\t\treturn \$bw->endObject();\n";
+							// $file .= "\n\t\treturn \$bw->sizedByteArray();\n";
+							$file .= "\n\t\treturn \$bw;\n";
 
 							$file .= "\t}\n\n";
 						}
 
 						if (!empty($currentSteamLanguage['values'])) {
-							$file .= "\tpublic function decode(\$stream)\n\t{\n\t\t\$br = new BinaryReader(\$stream);\n\t\t\$results = [];\n";
+							$file .= "\tpublic function decode(\$stream)\n\t{\n\t\t\$br = new BinReader(\$stream);\n\t\t\$results = [];\n";
 							$file .= "\n"; $readerTypeMap = $this->_readerTypeMap();
 							foreach ($currentSteamLanguage['values'] as $value) {
-								$method = 'readInt32';
+								$method = 'readInt';
 								if (array_key_exists($value['type'], $readerTypeMap)) {
 									$method = $readerTypeMap[$value['type']]['read'];
 								}
@@ -177,12 +241,17 @@ class SteamLanguages
 
 						$file .= "}\n\n?>";
 
-						// echo '<pre>'; var_dump($file); echo '</pre>';
+						// if ($currentSteamLanguage['class'] == 'MsgHdrProtoBuf') {
+							// echo '<pre>'; var_dump($currentSteamLanguage); echo '</pre>';
+							// die();
+						// }
 
 						\SteamKit\Helper\FileManager::writeFileData(APP_ROOT_FOLDER . 'Base/SteamLanguage/' . $currentSteamLanguage['class'] . '.php', $file);
 
 						$currentSteamLanguage = null;
 					} else if (!empty($line) && $line !== '{') {
+						// echo '<pre>'; var_dump($line); echo '</pre>';
+
 						$extra = false;
 						if (preg_match('/\<(.*)\>/', $line, $extra) !== 0) {
 							$extra = $extra[1];
@@ -206,19 +275,42 @@ class SteamLanguages
 								'value' => $attributes[3]
 							];
 						} else if ($flag == 'steamidmarshal' && $type == 'ulong') {
-							$currentSteamLanguage['marshals']['steamidmarshal'][] = [
+							$currentSteamLanguage['values'][] = [
 								'name' => $attributes[2],
-								'type' => $type
+								'type' => $type,
+								'value' => 0,
+								'extra' => 'steamidmarshal'
 							];
 						} else if ($flag == 'boolmarshal' && $type == 'byte') {
-							$currentSteamLanguage['marshals']['boolmarshal'][] = [
+							$currentSteamLanguage['value'][] = [
 								'name' => $attributes[2],
-								'type' => $type
+								'type' => $type,
+								'value' => 0,
+								'extra' => 'boolmarshal'
 							];
 						} else if ($flag == 'gameidmarshal' && $type == 'ulong') {
-							$currentSteamLanguage['marshals']['gameidmarshal'][] = [
+							$currentSteamLanguage['values'][] = [
 								'name' => $attributes[2],
-								'type' => $type
+								'type' => $type,
+								'value' => 0,
+								'extra' => 'gameidmarshal'
+							];
+						} else if ($flag == 'protomask') {
+							list($class, $value) = explode('::', $attributes[3]);
+							if ($class == 'EMsg') {
+								$value = '\SteamKit\Base\Enums\EMsg::' . $value;
+							}
+
+							$name = $attributes[1];
+							if ($name == 'EMsg') {
+								$name = 'msg';
+							}
+
+							$currentSteamLanguage['values'][] = [
+								'name' => $name,
+								'type' => ($type ? $type : $attributes[1]),
+								'value' => $value,
+								'extra' => $extra
 							];
 						} else if ($flag == 'protomaskgc') {
 							$currentSteamLanguage['values'][] = [
@@ -227,24 +319,42 @@ class SteamLanguages
 								'value' => (isset($attributes[3]) ? $attributes[3] : false),
 								'extra' => $extra
 							];
-						// } else if ($flag == 'proto') {
-							// $currentSteamLanguage['values'][] = [
-								// 'name' => ucwords($attributes[2]),
-								// 'type' => $type,
-								// 'value' => $attributes[3],
-								// 'extra' => $extra
-							// ];
-						} else {
-							// echo '<pre>'; var_dump($attributes); echo '</pre>';
+						} else if ($flag == 'proto') {
+							$value = $attributes[1];
+							if (strpos($value, 'SteamKit2.GC.Internal.') !== false || strpos($value, 'SteamKit2.Internal.') !== false) {
+								$type = substr($value, strrpos($value, '.') + 1);
+								$value = 'new \SteamKit\Base\SteamMsgBase\\' . $type . '()';
+							}
 
+							$currentSteamLanguage['values'][] = [
+								'name' => $flag,
+								'type' => $flag,
+								'value' => $value,
+								'extra' => $extra
+							];
+						} else {
+							$type = ($type ? $type : $attributes[0]);
 							$value = (isset($attributes[2]) ? $attributes[2] : false);
 							$value = str_replace('ulong.MaxValue', 0xFFFFFFFFFFFFFFFF, $value);
 							if (strpos($value, 'EMsg') !== false) {
 								$value = '\SteamKit\Base\Enums\\' . $value;
+							} else if (strpos($value, '::') !== false) {
+								list($class, $value) = explode('::', $value);
+								if ($class == $currentSteamLanguage['class']) {
+									$value = 'self::' . $value;
+								} else if (in_array($class, $classes)) {
+									$value = '\SteamKit\Base\SteamLanguage\\' . $class . '::' . $value;
+								} else {
+									$value = '\SteamKit\Base\Enums\\' . $class . '::' . $value;
+								}
+							}
+
+							if (!$type || empty($value)) {
+								$value = 0;
 							}
 
 							$currentSteamLanguage['values'][] = [
-								'name' => $attributes[1],
+								'name' => lcfirst($attributes[1]),
 								'type' => ($type ? $type : $attributes[0]),
 								'value' => $value,
 								'extra' => $extra

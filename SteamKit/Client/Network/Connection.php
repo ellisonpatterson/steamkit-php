@@ -2,9 +2,7 @@
 
 namespace SteamKit\Client\Network;
 
-use Google\FlatBuffers\ByteBuffer;
-use PhpBinaryReader\BinaryReader;
-use PhpBinaryReader\Endian;
+use SteamKit\Helper\BinReader;
 
 abstract class Connection
 {
@@ -43,43 +41,59 @@ abstract class Connection
 		$this->_client->connect($server['host'], $server['port'], 0.5);
 	}
 
+	public function disconnect()
+	{
+		$this->_client->close();
+	}
+
+	public function reconnect()
+	{
+		$this->disconnect();
+		$this->setServer(\SteamKit\Client\Network\Servers::getRandomServer());
+		sleep(1);
+		$this->connect();
+	}
+
 	public function getPacketMsg($data)
 	{
+		var_dump($data);
 		if (!$data) {
-			die("No response received!\n");
+			return $this->reconnect();
 		}
 
-		$binaryReader = new BinaryReader($data, Endian::ENDIAN_LITTLE);
+		$binaryReader = new BinReader($data);
 
-		$rawEMsg = $binaryReader->readUInt32();
+		$rawEMsg = $binaryReader->readUInt();
 		$eMsg = $rawEMsg & ~self::protoMask;
 
 		if ($eMsg == \SteamKit\Base\Enums\EMsg::ChannelEncryptRequest || $eMsg == \SteamKit\Base\Enums\EMsg::ChannelEncryptResult) {
-			$response = new \SteamKit\Base\SteamLanguage\MsgHdr();
-			$header = $response->decode($data);
+			$header = new \SteamKit\Base\SteamLanguage\MsgHdr();
+			$header->decode($data);
 
 			$sourceJobId = $header->getSourceJobID();
 			$targetJobId = $header->getTargetJobID();
 
 			var_dump($header);
-			echo 'encrypted';
+			echo "\n\n";
 		} else if ($rawEMsg & self::protoMask) {
-			$response = new \SteamKit\Base\SteamLanguage\MsgHdrProtoBuf();
-			$header = $response->decode($data);
-			var_dump($header);
+			$header = new \SteamKit\Base\SteamLanguage\MsgHdrProtoBuf();
+			$header->decode($data);
 		} else {
-			$response = new \SteamKit\Base\SteamLanguage\ExtendedClientMsgHdr();
-			$header = $response->decode($data);
+			$header = new \SteamKit\Base\SteamLanguage\ExtendedClientMsgHdr();
+			$header->decode($data);
 
 			$sourceJobId = $header->getSourceJobID();
 			$targetJobId = $header->getTargetJobID();
 		}
 
-		var_dump($rawEMsg);
-		var_dump($eMsg);
+		$response = Handlers::getHandlerByEMsg($eMsg, $data);
+		if (!$response) {
+			return $this->disconnect();
+		}
+
+		return $response;
 	}
 
-	abstract public function send($data);
 	abstract public function getMagic();
 	abstract public function getConnectionType();
 

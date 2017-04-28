@@ -126,9 +126,9 @@ class Builder
 	public function addAllSteamLanguages()
 	{
 		$this->_steamLanguages->addSteamLanguages([
-			['file' => 'gamecoordinator.steamd', 'interface' => 'IGCSerializableHeader'],
 			['file' => 'header.steamd', 'interface' => 'ISteamSerializableHeader'],
 			['file' => 'netheader.steamd', 'interface' => 'ISteamSerializable'],
+			['file' => 'gamecoordinator.steamd', 'interface' => 'IGCSerializableHeader'],
 			['file' => 'steammsg.steamd', 'interface' => 'ISteamSerializableMessage'],
 		]);
 	}
